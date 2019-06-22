@@ -3,6 +3,7 @@ import random
 
 import fire
 import numpy as np
+from scipy.optimize import rosen
 
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ class EmployedBee(Bee):
         if old_fitness is None or new_fitness > old_fitness:
             logger.debug("Updating position")
             self.pos[:] = new_pos
+            self.tries = 0
         else:
             logger.debug("Keeping old position")
             self.tries += 1
@@ -103,15 +105,17 @@ def square_well(x):
     return np.sum(x*x)
 
 
-def main(n_employed, n_onlooker, n_scout, limit=10, max_cycles=100):
-    employed_bees = [EmployedBee.random_init(func=square_well, limit=limit, dim=2)
-                     for _ in range(n_employed)]
-    onlooker_bees = [OnlookerBee.random_init(func=square_well, limit=limit, dim=2)
-                     for _ in range(n_onlooker)]
-    scout_bees = [ScoutBee.random_init(func=square_well, limit=limit, dim=2)
-                  for _ in range(n_scout)]
+def main(n_employed, n_onlooker, limit=10, max_cycles=100):
 
-    bees = employed_bees + onlooker_bees + scout_bees
+    func = rosen
+    dim = 3
+
+    employed_bees = [EmployedBee.random_init(func=func, limit=limit, dim=dim)
+                     for _ in range(n_employed)]
+    onlooker_bees = [OnlookerBee.random_init(func=func, limit=limit, dim=dim)
+                     for _ in range(n_onlooker)]
+
+    bees = employed_bees + onlooker_bees
 
     for _ in range(max_cycles):
         logger.info("Employed bee phase")
@@ -123,8 +127,11 @@ def main(n_employed, n_onlooker, n_scout, limit=10, max_cycles=100):
             bee.run(bees)
 
         logger.info("Scout bee phase")
-        for bee in scout_bees:
-            bee.run(bees)
+        for bee in employed_bees:
+            if bee.tries > limit:
+                logger.debug("Tries above limit")
+                bee.global_update()
+                bee.tries = 0
 
         # get bee with best fitness
         best_bee = max(bees, key=lambda bee: bee.fitness)
