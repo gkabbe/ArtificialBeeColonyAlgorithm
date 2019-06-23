@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Bee:
     def __init__(self, pos, *, func, dim, limit, search_radius=1, lower_bound, upper_bound):
-        self.pos = np.atleast_1d(pos)
+        self.pos = np.atleast_1d(pos).astype(float)
         self.func = func
         self.dim = dim
         self.limit = limit
@@ -27,7 +27,7 @@ class Bee:
     def global_update(self):
         logger.debug("Old position: %s", self.pos)
         lower_bound, upper_bound = self.bounds
-        self.pos = np.random.uniform(lower_bound, upper_bound, self.dim)
+        self.pos[:] = np.random.uniform(lower_bound, upper_bound, self.dim)
         logger.debug("New position: %s", self.pos)
 
     @classmethod
@@ -89,7 +89,7 @@ class OnlookerBee(EmployedBee):
         fitness_vals = [bee.fitness for bee in bees]
         cumsum = np.cumsum(fitness_vals)
         idx = np.searchsorted(cumsum, np.random.uniform(0, cumsum[-1]))
-        self.pos = bees[idx].pos
+        self.pos[:] = bees[idx].pos
 
     def run(self, bees: list):
         self.choose_food_source(bees)
@@ -106,31 +106,37 @@ def square_well(x):
 
 
 class Swarm:
-    def __init__(self, func, dim, *, n_employed, n_onlooker, limit=10, max_cycles=100):
-        self.employed_bees = [EmployedBee.random_init(func=func, limit=limit, dim=dim)
-                              for _ in range(n_employed)]
-        self.onlooker_bees = [OnlookerBee.random_init(func=func, limit=limit, dim=dim)
-                              for _ in range(n_onlooker)]
+    def __init__(self, func, dim, *, n_employed, n_onlooker, limit=10, max_cycles=100, **kwargs):
+        self.bees = np.zeros(n_employed + n_onlooker, dtype=object)
 
-        self.bees = self.employed_bees + self.onlooker_bees
+        self.bees[:n_employed] = [EmployedBee.random_init(func=func, limit=limit, dim=dim, **kwargs)
+                                  for _ in range(n_employed)]
+        self.bees[n_employed:] = [OnlookerBee.random_init(func=func, limit=limit, dim=dim, **kwargs)
+                                  for _ in range(n_onlooker)]
+
+        self.employed_bees = self.bees[:n_employed]
+        self.onlooker_bees = self.bees[n_employed:]
 
         self.limit = limit
         self.max_cycles = max_cycles
+
+        self.best_position = None
+        self.best_fitness = None
 
     def run(self):
         for _ in range(self.max_cycles):
             self.step()
 
     def step(self):
-        logger.info("Employed bee phase")
+        logger.debug("Employed bee phase")
         for bee in self.employed_bees:
             bee.run(self.bees)
 
-        logger.info("Onlooker bee phase")
+        logger.debug("Onlooker bee phase")
         for bee in self.onlooker_bees:
             bee.run(self.bees)
 
-        logger.info("Scout bee phase")
+        logger.debug("Scout bee phase")
         for bee in self.employed_bees:
             if bee.tries > self.limit:
                 logger.debug("Tries above limit")
@@ -139,13 +145,33 @@ class Swarm:
 
         # get bee with best fitness
         best_bee = max(self.bees, key=lambda bee: bee.fitness)
-        logger.info("Best position so far: %s with fitness %s", best_bee.pos,
+        logger.info("Best position in this step: %s with fitness %s", best_bee.pos,
                     best_bee.fitness)
+
+        if self.best_fitness is None or best_bee.fitness > self.best_fitness:
+            self.best_fitness = best_bee.fitness
+            self.best_position = best_bee.pos
+
+        logger.info("Overall best position: %s with fitness %s", self.best_position,
+                                                                 self.best_fitness)
+
+    @property
+    def positions(self):
+        return np.vstack([self.employed_positions, self.onlooker_positions])
+
+    @property
+    def employed_positions(self):
+        return np.array([bee.pos for bee in self.employed_bees])
+
+    @property
+    def onlooker_positions(self):
+        return np.array([bee.pos for bee in self.onlooker_bees])
 
 
 def main(n_employed, n_onlooker, limit=10, max_cycles=100, log_level="info"):
     logging.basicConfig(level=getattr(logging, log_level.upper()))
 
+    # func = lambda x: x*x - 5 * np.cos(x)
     func = rosen
     dim = 3
 
