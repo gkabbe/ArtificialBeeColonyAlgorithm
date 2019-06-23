@@ -105,39 +105,54 @@ def square_well(x):
     return np.sum(x*x)
 
 
-def main(n_employed, n_onlooker, limit=10, max_cycles=100):
+class Swarm:
+    def __init__(self, func, dim, *, n_employed, n_onlooker, limit=10, max_cycles=100):
+        self.employed_bees = [EmployedBee.random_init(func=func, limit=limit, dim=dim)
+                              for _ in range(n_employed)]
+        self.onlooker_bees = [OnlookerBee.random_init(func=func, limit=limit, dim=dim)
+                              for _ in range(n_onlooker)]
 
-    func = rosen
-    dim = 3
+        self.bees = self.employed_bees + self.onlooker_bees
 
-    employed_bees = [EmployedBee.random_init(func=func, limit=limit, dim=dim)
-                     for _ in range(n_employed)]
-    onlooker_bees = [OnlookerBee.random_init(func=func, limit=limit, dim=dim)
-                     for _ in range(n_onlooker)]
+        self.limit = limit
+        self.max_cycles = max_cycles
 
-    bees = employed_bees + onlooker_bees
+    def run(self):
+        for _ in range(self.max_cycles):
+            self.step()
 
-    for _ in range(max_cycles):
+    def step(self):
         logger.info("Employed bee phase")
-        for bee in employed_bees:
-            bee.run(bees)
+        for bee in self.employed_bees:
+            bee.run(self.bees)
 
         logger.info("Onlooker bee phase")
-        for bee in onlooker_bees:
-            bee.run(bees)
+        for bee in self.onlooker_bees:
+            bee.run(self.bees)
 
         logger.info("Scout bee phase")
-        for bee in employed_bees:
-            if bee.tries > limit:
+        for bee in self.employed_bees:
+            if bee.tries > self.limit:
                 logger.debug("Tries above limit")
                 bee.global_update()
                 bee.tries = 0
 
         # get bee with best fitness
-        best_bee = max(bees, key=lambda bee: bee.fitness)
-        logger.info("Best position so far: %s with fitness %s", best_bee.pos, best_bee.fitness)
+        best_bee = max(self.bees, key=lambda bee: bee.fitness)
+        logger.info("Best position so far: %s with fitness %s", best_bee.pos,
+                    best_bee.fitness)
+
+
+def main(n_employed, n_onlooker, limit=10, max_cycles=100, log_level="info"):
+    logging.basicConfig(level=getattr(logging, log_level.upper()))
+
+    func = rosen
+    dim = 3
+
+    swarm = Swarm(func, dim, n_employed=n_employed, n_onlooker=n_onlooker, limit=10,
+                  max_cycles=max_cycles)
+    swarm.run()
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
     fire.Fire(main)
