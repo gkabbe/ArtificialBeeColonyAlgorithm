@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class Bee:
-    def __init__(self, pos, *, func, dim, limit, search_radius=1, lower_bound, upper_bound):
+    def __init__(
+        self, pos, *, func, dim, limit, search_radius=1, lower_bound, upper_bound
+    ):
         self.pos = np.atleast_1d(pos).astype(float)
         self.func = func
         self.dim = dim
@@ -29,33 +31,48 @@ class Bee:
         lower_bound, upper_bound = self.bounds
         self.pos[:] = np.random.uniform(lower_bound, upper_bound, self.dim)
         logger.debug("New position: %s", self.pos)
+        self._fitness = self.calculate_fitness(self.pos)
 
     @classmethod
-    def random_init(cls, *, func, dim, limit, search_radius=1, lower_bound=-100,
-                    upper_bound=100):
-        bee = cls([0] * dim, func=func, dim=dim, limit=limit, search_radius=search_radius,
-                  lower_bound=lower_bound, upper_bound=upper_bound)
+    def random_init(
+        cls, *, func, dim, limit, search_radius=1, lower_bound=-100, upper_bound=100
+    ):
+        bee = cls(
+            [0] * dim,
+            func=func,
+            dim=dim,
+            limit=limit,
+            search_radius=search_radius,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
         bee.global_update()
         return bee
 
     @classmethod
     def init_from_other_bee(cls, bee):
-        new_bee = cls(bee.pos, func=bee.func, dim=bee.dim, limit=bee.limit,
-                      search_radius=bee.search_radius, lower_bound=bee.lower_bound,
-                      upper_bound=bee.upper_bound)
+        new_bee = cls(
+            bee.pos,
+            func=bee.func,
+            dim=bee.dim,
+            limit=bee.limit,
+            search_radius=bee.search_radius,
+            lower_bound=bee.lower_bound,
+            upper_bound=bee.upper_bound,
+        )
         return new_bee
 
     def calculate_fitness(self, pos):
         fx = self.func(pos)
         if fx >= 0:
-            self._fitness = 1 / (1 + fx)
+            _fitness = 1 / (1 + fx)
         else:
-            self._fitness = 1 - fx
-        return self._fitness
+            _fitness = 1 - fx
+        return _fitness
 
     @property
     def fitness(self):
-        return self.calculate_fitness(self.pos)
+        return self._fitness
 
 
 class EmployedBee(Bee):
@@ -65,18 +82,20 @@ class EmployedBee(Bee):
         random_pos = random.choice([bee.pos for bee in bees])
         logger.debug("Testing new position %s", random_pos)
         i = np.random.randint(0, self.dim)
-        new_pos_i = (self.pos[i] +
-            np.random.uniform(-self.search_radius, self.search_radius) * (random_pos[i] - self.pos[i]))
+        new_pos_i = self.pos[i] + np.random.uniform(
+            -self.search_radius, self.search_radius
+        ) * (random_pos[i] - self.pos[i])
         new_pos = np.copy(self.pos)
         new_pos[i] = new_pos_i
         old_fitness = self._fitness
-        logger.debug("Old fitness value: %.4e", old_fitness)
+        logger.debug("Old fitness value: %s", old_fitness)
         new_fitness = self.calculate_fitness(new_pos)
-        logger.debug("New fitness value: %.4e", new_fitness)
+        logger.debug("New fitness value: %s", new_fitness)
         if old_fitness is None or new_fitness > old_fitness:
             logger.debug("Updating position")
             self.pos[:] = new_pos
             self.tries = 0
+            self._fitness = new_fitness
         else:
             logger.debug("Keeping old position")
             self.tries += 1
@@ -90,6 +109,7 @@ class OnlookerBee(EmployedBee):
         cumsum = np.cumsum(fitness_vals)
         idx = np.searchsorted(cumsum, np.random.uniform(0, cumsum[-1]))
         self.pos[:] = bees[idx].pos
+        self._fitness = bees[idx].fitness
 
     def run(self, bees: list):
         self.choose_food_source(bees)
@@ -102,17 +122,23 @@ class ScoutBee(Bee):
 
 
 def square_well(x):
-    return np.sum(x*x)
+    return np.sum(x * x)
 
 
 class Swarm:
-    def __init__(self, func, dim, *, n_employed, n_onlooker, limit=10, max_cycles=100, **kwargs):
+    def __init__(
+        self, func, dim, *, n_employed, n_onlooker, limit=10, max_cycles=100, **kwargs
+    ):
         self.bees = np.zeros(n_employed + n_onlooker, dtype=object)
 
-        self.bees[:n_employed] = [EmployedBee.random_init(func=func, limit=limit, dim=dim, **kwargs)
-                                  for _ in range(n_employed)]
-        self.bees[n_employed:] = [OnlookerBee.random_init(func=func, limit=limit, dim=dim, **kwargs)
-                                  for _ in range(n_onlooker)]
+        self.bees[:n_employed] = [
+            EmployedBee.random_init(func=func, limit=limit, dim=dim, **kwargs)
+            for _ in range(n_employed)
+        ]
+        self.bees[n_employed:] = [
+            OnlookerBee.random_init(func=func, limit=limit, dim=dim, **kwargs)
+            for _ in range(n_onlooker)
+        ]
 
         self.employed_bees = self.bees[:n_employed]
         self.onlooker_bees = self.bees[n_employed:]
@@ -125,7 +151,7 @@ class Swarm:
 
     def run(self):
         for _ in range(self.max_cycles):
-            self.step()
+            yield self.step()
 
     def step(self):
         logger.debug("Employed bee phase")
@@ -145,15 +171,22 @@ class Swarm:
 
         # get bee with best fitness
         best_bee = max(self.bees, key=lambda bee: bee.fitness)
-        logger.info("Best position in this step: %s with fitness %s", best_bee.pos,
-                    best_bee.fitness)
+        logger.info(
+            "Best position in this step: %s with fitness %s",
+            best_bee.pos,
+            best_bee.fitness,
+        )
 
         if self.best_fitness is None or best_bee.fitness > self.best_fitness:
             self.best_fitness = best_bee.fitness
             self.best_position = best_bee.pos
 
-        logger.info("Overall best position: %s with fitness %s", self.best_position,
-                                                                 self.best_fitness)
+        logger.info(
+            "Overall best position: %s with fitness %s",
+            self.best_position,
+            self.best_fitness,
+        )
+        return best_bee.pos
 
     @property
     def positions(self):
@@ -175,8 +208,14 @@ def main(n_employed, n_onlooker, limit=10, max_cycles=100, log_level="info"):
     func = rosen
     dim = 3
 
-    swarm = Swarm(func, dim, n_employed=n_employed, n_onlooker=n_onlooker, limit=10,
-                  max_cycles=max_cycles)
+    swarm = Swarm(
+        func,
+        dim,
+        n_employed=n_employed,
+        n_onlooker=n_onlooker,
+        limit=10,
+        max_cycles=max_cycles,
+    )
     swarm.run()
 
 
