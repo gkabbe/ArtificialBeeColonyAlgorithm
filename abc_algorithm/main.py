@@ -78,7 +78,7 @@ class Bee:
 class EmployedBee(Bee):
     def local_update(self, bees):
         logger.debug("Old position: %s", self.pos)
-        logger.debug("Doing local update")
+        logger.info("Doing local update")
         random_pos = random.choice([bee.pos for bee in bees])
         logger.debug("Testing new position %s", random_pos)
         i = np.random.randint(0, self.dim)
@@ -88,11 +88,11 @@ class EmployedBee(Bee):
         new_pos = np.copy(self.pos)
         new_pos[i] = new_pos_i
         old_fitness = self._fitness
-        logger.debug("Old fitness value: %s", old_fitness)
+        logger.info("Old fitness value: %s", old_fitness)
         new_fitness = self.calculate_fitness(new_pos)
-        logger.debug("New fitness value: %s", new_fitness)
+        logger.info("New fitness value: %s", new_fitness)
         if old_fitness is None or new_fitness > old_fitness:
-            logger.debug("Updating position")
+            logger.info("Updating position")
             self.pos[:] = new_pos
             self.tries = 0
             self._fitness = new_fitness
@@ -154,15 +154,15 @@ class Swarm:
             yield self.step()
 
     def step(self):
-        logger.debug("Employed bee phase")
+        logger.info("Employed bee phase")
         for bee in self.employed_bees:
             bee.run(self.bees)
 
-        logger.debug("Onlooker bee phase")
+        logger.info("Onlooker bee phase")
         for bee in self.onlooker_bees:
             bee.run(self.bees)
 
-        logger.debug("Scout bee phase")
+        logger.info("Scout bee phase")
         for bee in self.employed_bees:
             if bee.tries > self.limit:
                 logger.debug("Tries above limit")
