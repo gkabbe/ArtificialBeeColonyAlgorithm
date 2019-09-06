@@ -8,3 +8,8 @@ author = "Gabriel Kabbe"
 author-email = "gabriel.kabbe@chemie.uni-halle.de"
 classifiers = ["License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"]
 
+
+[tool.flit.metadata.requires-extra]
+test = [
+    "pytest >= 5.0.1",
+]

@@ -3,7 +3,6 @@ import random
 
 import fire
 import numpy as np
-from scipy.optimize import rosen
 
 
 logger = logging.getLogger(__name__)
@@ -199,24 +198,6 @@ class Swarm:
     @property
     def onlooker_positions(self):
         return np.array([bee.pos for bee in self.onlooker_bees])
-
-
-def main(n_employed, n_onlooker, limit=10, max_cycles=100, log_level="info"):
-    logging.basicConfig(level=getattr(logging, log_level.upper()))
-
-    # func = lambda x: x*x - 5 * np.cos(x)
-    func = rosen
-    dim = 3
-
-    swarm = Swarm(
-        func,
-        dim,
-        n_employed=n_employed,
-        n_onlooker=n_onlooker,
-        limit=10,
-        max_cycles=max_cycles,
-    )
-    swarm.run()
 
 
 if __name__ == "__main__":
